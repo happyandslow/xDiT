@@ -11,16 +11,27 @@ RUN pip install --no-cache-dir --upgrade pip
 
 # Uninstall apex first
 RUN pip uninstall -y apex
+RUN pip uninstall -y xfuser
 
 # # Install flash_attn separately with --use-pep517 flag
 # RUN pip install --no-cache-dir --use-pep517 flash-attn==2.6.3 flask
 
-RUN pip install xfuser
+RUN pip install xfuser[diffusers,flash-attn,ray]
+RUN pip install fastapi
+RUN pip install uvicorn
 
 RUN pip install flask
+# ensure numpy stays <2 to keep compatibility with the base pytorch wheel
+RUN pip uninstall -y opencv-python opencv-python-headless || true
+
+# install headless (safe for containers) and pin numpy
+RUN pip install --no-cache-dir "numpy<2" "opencv-python-headless==4.8.0.74"
+
+RUN pip install --no-cache-dir imageio imageio-ffmpeg
 
 # Copy the entire comfyui-xdit directory into the container
-COPY ./http-service /app/http-service
+COPY ./entrypoints /app/entrypoints
+COPY ./examples /app/examples   
 
 # Change to the xDiT directory
 WORKDIR /app
