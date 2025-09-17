@@ -15,12 +15,14 @@ RUN pip uninstall -y apex
 # # Install flash_attn separately with --use-pep517 flag
 # RUN pip install --no-cache-dir --use-pep517 flash-attn==2.6.3 flask
 
-RUN pip install xfuser
+RUN pip install xfuser[diffusers,flash-attn,ray]
+RUN pip install fastapi
+RUN pip install uvicorn
 
 RUN pip install flask
 
 # Copy the entire comfyui-xdit directory into the container
-COPY ./http-service /app/http-service
+COPY ./entrypoints /app/entrypoints
 
 # Change to the xDiT directory
 WORKDIR /app

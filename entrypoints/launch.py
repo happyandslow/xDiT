@@ -108,7 +108,7 @@ class ImageGenerator:
                 output_type="pil",
                 generator=torch.Generator(device="cuda").manual_seed(request.seed),
                 guidance_scale=request.cfg,
-                max_sequence_length=self.input_config.max_sequence_length
+                #max_sequence_length=self.input_config.max_sequence_length
             )
             elapsed_time = time.time() - start_time
 
