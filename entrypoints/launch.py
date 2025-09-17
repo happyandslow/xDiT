@@ -77,6 +77,7 @@ class ImageGenerator:
             "PixArt-XL-2-1024-MS": xFuserPixArtAlphaPipeline,
             "PixArt-Sigma-XL-2-2K-MS": xFuserPixArtSigmaPipeline,
             "stable-diffusion-3-medium-diffusers": xFuserStableDiffusion3Pipeline,
+            "stable-diffusion-3.5-large": xFuserStableDiffusion3Pipeline,
             "HunyuanDiT-v1.2-Diffusers": xFuserHunyuanDiTPipeline,
             "FLUX.1-schnell": xFuserFluxPipeline,
             "FLUX.1-dev": xFuserFluxPipeline,
@@ -108,7 +109,7 @@ class ImageGenerator:
                 output_type="pil",
                 generator=torch.Generator(device="cuda").manual_seed(request.seed),
                 guidance_scale=request.cfg,
-                max_sequence_length=self.input_config.max_sequence_length
+                #max_sequence_length=self.input_config.max_sequence_length
             )
             elapsed_time = time.time() - start_time
 
@@ -201,6 +202,7 @@ if __name__ == "__main__":
         ulysses_degree=args.ulysses_parallel_degree,
         pipefusion_parallel_degree=args.pipefusion_parallel_degree,
         use_cfg_parallel=args.use_cfg_parallel,
+        ring_degree=args.ring_degree,
         dit_parallel_size=0,
     )
     
