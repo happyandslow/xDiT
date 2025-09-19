@@ -261,6 +261,8 @@ async def generate_video(request: GenerateRequest):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='xDiT HTTP Service')
+    parser.add_argument('--host', type=str, default='127.0.0.1', help='Host IP')
+    parser.add_argument('--port', type=str, default='6000', help='Host Port')
     parser.add_argument('--model_path', type=str, help='Path to the model', required=True)
     parser.add_argument('--world_size', type=int, default=1, help='Number of parallel workers')
     parser.add_argument('--num_frames', type=int, default=17, help='Number of frames')
@@ -297,4 +299,4 @@ if __name__ == "__main__":
     
     # Start the server
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=6000)
+    uvicorn.run(app, host=args.host, port=args.port)
