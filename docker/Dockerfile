@@ -16,7 +16,11 @@ RUN pip uninstall -y xfuser
 # # Install flash_attn separately with --use-pep517 flag
 # RUN pip install --no-cache-dir --use-pep517 flash-attn==2.6.3 flask
 
-RUN pip install xfuser[diffusers,flash-attn,ray]
+#RUN pip install --no-cache-dir xfuser[diffusers,flash-attn,ray]
+#RUN pip install -e ".[diffusers,flash-attn,ray]"
+RUN git clone --branch lexu/custom-endpoint https://github.com/happyandslow/xDiT.git /app/xDiT
+RUN cd /app/xDiT && pip install -e ".[diffusers,flash-attn,ray]"
+RUN cd /app
 RUN pip install fastapi
 RUN pip install uvicorn
 
