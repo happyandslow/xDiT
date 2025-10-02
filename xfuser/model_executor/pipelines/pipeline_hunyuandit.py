@@ -329,6 +329,7 @@ class xFuserHunyuanDiTPipeline(xFuserPipelineBaseWrapper):
             self.transformer.inner_dim // self.transformer.num_heads,
             grid_crops_coords,
             (grid_height, grid_width),
+            output_type = "pt"
         )
 
         style = torch.tensor([0], device=device)
