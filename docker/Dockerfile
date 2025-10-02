@@ -15,8 +15,7 @@ RUN pip uninstall -y xfuser
 # RUN pip install --no-cache-dir xfuser[diffusers,flash-attn,ray]
 # RUN pip install -e ".[diffusers,flash-attn,ray]"
 COPY . /app/xDiT
-RUN cd /app/xDiT
-RUN pip install --no-cache-dir -e ".[diffusers,flash-attn,ray]"
+RUN cd /app/xDiT && pip install --no-cache-dir -e ".[diffusers,flash-attn,ray]"
 RUN cd /app
 RUN pip install fastapi
 RUN pip install uvicorn
