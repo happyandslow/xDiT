@@ -3,7 +3,6 @@ import time
 from cv2.gapi import video
 import torch
 import ray
-import io
 import logging
 import base64
 import tempfile
@@ -16,14 +15,19 @@ from xfuser import (
     xFuserCogVideoXPipeline,
     xFuserConsisIDPipeline,
     xFuserLattePipeline,
-    xFuserArgs,
+    xFuserArgs,    
+    utils,
 )
+from diffusers import (
+    DiffusionPipeline, 
+    HunyuanVideoPipeline, 
+    HunyuanVideoTransformer3DModel
+)
+
 from xfuser.core.distributed import (
-    get_world_group,
-    get_data_parallel_rank,
-    get_data_parallel_world_size,
     get_runtime_state,
-    is_dp_last_group,
+    initialize_runtime_state,
+    get_pipeline_parallel_world_size,
 )
 from diffusers.utils import export_to_video
 # Define request model
@@ -90,7 +94,6 @@ class VideoGenerator:
             self.logger.setLevel(logging.INFO)
 
     def initialize_model(self, xfuser_args : xFuserArgs):
-
         # init distributed environment in create_config
         self.engine_config, self.input_config = xfuser_args.create_config()
         # Remove use_resolution_binning if it exists to avoid compatibility issues
@@ -102,19 +105,52 @@ class VideoGenerator:
             "CogVideoX-2b": xFuserCogVideoXPipeline,
             "ConsisID-preview": xFuserConsisIDPipeline,
             "Latte-1": xFuserLattePipeline,
+            "HunyuanVideoHF": HunyuanVideoPipeline,
         }
 
         PipelineClass = pipeline_map.get(model_name)
         if PipelineClass is None:
             raise NotImplementedError(f"{model_name} is currently not supported!")
 
+        
         self.logger.info(f"Initializing model {model_name} from {xfuser_args.model}")
 
-        self.pipe = PipelineClass.from_pretrained(
-            pretrained_model_name_or_path=xfuser_args.model,
-            engine_config=self.engine_config,
-            torch_dtype=torch.float16,
-        ).to("cuda")
+        if model_name != "HunyuanVideoHF":
+            self.pipe = PipelineClass.from_pretrained(
+                pretrained_model_name_or_path=xfuser_args.model,
+                engine_config=self.engine_config,
+                torch_dtype=torch.float16,
+            ).to("cuda")
+            get_runtime_state().set_video_input_parameters(
+                height=xfuser_args.height,
+                width=xfuser_args.width,
+                num_frames=xfuser_args.num_frames,
+                batch_size=xfuser_args.batch_size,
+                num_inference_steps=xfuser_args.num_inference_steps,
+                split_text_embed_in_sp=get_pipeline_parallel_world_size() == 1,
+            ) 
+        else:
+            self.pipe = PipelineClass.from_pretrained(
+                pretrained_model_name_or_path=xfuser_args.model,
+                transformer=HunyuanVideoTransformer3DModel.from_pretrained(
+                    pretrained_model_name_or_path=self.engine_config.model_config.model,
+                    subfolder="transformer",
+                    torch_dtype=torch.bfloat16,
+                    revision="refs/pr/18",
+                ),
+                engine_config=self.engine_config,
+                torch_dtype=torch.float16,
+            ).to("cuda")
+            initialize_runtime_state(self.pipe, self.engine_config)
+            get_runtime_state().set_video_input_parameters(
+                height=xfuser_args.height,
+                width=xfuser_args.width,
+                num_frames=xfuser_args.num_frames,
+                num_inference_steps=xfuser_args.num_inference_steps,
+                split_text_embed_in_sp=get_pipeline_parallel_world_size() == 1,
+            ) 
+            # utils.parallelize_transformer(self.pipe)  
+            
         self.pipe.vae.enable_tiling()
         # Memory-efficient warmup run with smaller dimensions
         if not self.disable_warmup:
@@ -174,7 +210,7 @@ class VideoGenerator:
             # Clear CUDA cache after generation to free memory
             torch.cuda.empty_cache()
 
-            if self.pipe.is_dp_last_group():
+            if self.is_output_rank():
                 if request.save_disk_path:
                     timestamp = time.strftime("%Y%m%d-%H%M%S")
                     filename = f"generated_video_{timestamp}.mp4"
@@ -220,6 +256,27 @@ class VideoGenerator:
             self.logger.error(f"Error generating image: {str(e)}")
             raise HTTPException(status_code=500, detail=str(e))
 
+    def is_output_rank(self):
+        """
+        Determines if this process should handle the output (e.g., save or return result).
+        Compatible with both xfuser and diffusers pipelines.
+        """
+        try:
+            # Try to use xfuser's runtime state if available
+            from xfuser.core.distributed import get_runtime_state
+            runtime_state = get_runtime_state()
+            if runtime_state is not None and hasattr(runtime_state, "is_dp_last_group"):
+                return runtime_state.is_dp_last_group()
+        except Exception:
+            pass
+
+        # Fallback: use torch.distributed if initialized
+        if torch.distributed.is_initialized():
+            return torch.distributed.get_rank() == 0
+
+        # Fallback for single-process or non-distributed mode
+        return self.rank == 0
+
 class Engine:
     def __init__(self, world_size: int, xfuser_args: xFuserArgs):
         # Ensure Ray is initialized
@@ -262,7 +319,7 @@ async def generate_video(request: GenerateRequest):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='xDiT HTTP Service')
     parser.add_argument('--host', type=str, default='127.0.0.1', help='Host IP')
-    parser.add_argument('--port', type=str, default='6000', help='Host Port')
+    parser.add_argument('--port', type=int, default=6000, help='Host Port')
     parser.add_argument('--model_path', type=str, help='Path to the model', required=True)
     parser.add_argument('--world_size', type=int, default=1, help='Number of parallel workers')
     parser.add_argument('--num_frames', type=int, default=17, help='Number of frames')

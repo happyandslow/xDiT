@@ -10,6 +10,7 @@ from xfuser.model_executor.pipelines import (
     xFuserStableDiffusionXLPipeline,
     xFuserSanaPipeline,
     xFuserSanaSprintPipeline,
+    utils,
 )
 from xfuser.config import xFuserArgs, EngineConfig
 from xfuser.parallel import xDiTParallel
@@ -29,4 +30,5 @@ __all__ = [
     "xFuserArgs",
     "EngineConfig",
     "xDiTParallel",
+    "utils",
 ]

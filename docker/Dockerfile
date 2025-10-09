@@ -6,7 +6,8 @@ RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
 
 # Update pip to the latest version
 RUN pip install --no-cache-dir --upgrade pip
-RUN pip install --no-cache-dir "diffusers>=0.35.1" "transformers==4.37.2"
+# RUN pip install --no-cache-dir "diffusers>=0.35.1" "transformers==4.37.2"
+RUN pip install --no-cache-dir "diffusers>=0.35.1" "transformers==4.56.2"
 
 # Uninstall apex first
 RUN pip uninstall -y apex
